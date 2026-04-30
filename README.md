@@ -133,37 +133,3 @@ These Terms shall be governed by the laws of the State of Texas, United States, 
 Contact
 
 Questions regarding these Terms may be directed to:info@scratchscout.com
-About
-No description, website, or topics provided.
-Resources
-Readme
-Activity
-Stars
-0 stars
-Watchers
-0 watching
-Forks
-0 forks
-Releases
-No releases published
-Create a new release
-Packages
-No packages published
-Publish your first package
-Contributors 1
-
-    @HansDandle
-    HansDandle
-
-Footer
-© 2026 GitHub, Inc.
-Footer navigation
-
-    Terms
-    Privacy
-    Security
-    Status
-    Community
-    Docs
-    Contact
-
