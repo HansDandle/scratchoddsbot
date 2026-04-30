@@ -1,0 +1,40 @@
+export type InitResponse = {
+  type: "init";
+  postId: string;
+  count: number;
+  username: string;
+};
+
+export type IncrementResponse = {
+  type: "increment";
+  postId: string;
+  count: number;
+};
+
+export type IncrementRequest = {
+  amount: number;
+};
+
+export type DecrementResponse = {
+  type: "decrement";
+  postId: string;
+  count: number;
+};
+
+export type DecrementRequest = {
+  amount: number;
+};
+
+export const ApiEndpoint = {
+  Init: "/api/init",
+  Increment: "/api/increment",
+  Decrement: "/api/decrement",
+  OnPostCreate: "/internal/menu/post-create",
+  OnAppInstall: "/internal/on-app-install",
+  OnCommentCreate: "/internal/on-comment-create",
+  OnCommentSubmit: "/internal/on-comment-submit",
+  RefreshGames: "/internal/scheduler/refresh-games",
+  SeedCache: "/internal/seed-cache",
+} as const;
+
+export type ApiEndpoint = (typeof ApiEndpoint)[keyof typeof ApiEndpoint];

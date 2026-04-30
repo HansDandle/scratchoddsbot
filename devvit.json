@@ -1,0 +1,55 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "scratchoddsbot",
+  "post": {
+    "dir": "public",
+    "entrypoints": {
+      "default": {
+        "inline": true,
+        "entry": "splash.html"
+      },
+      "game": {
+        "entry": "game.html"
+      }
+    }
+  },
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.js"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Create a new post",
+        "description": "scratchoddsbot",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-create"
+      }
+    ]
+  },
+  "permissions": {
+    "reddit": { "enable": true },
+    "http": { "enable": true, "domains": ["gist.githubusercontent.com"] }
+  },
+  "scheduler": {
+    "tasks": {
+      "refresh-games": {
+        "cron": "30 13 * * *",
+        "endpoint": "/internal/scheduler/refresh-games"
+      }
+    }
+  },
+  "triggers": {
+    "onAppInstall": "/internal/on-app-install",
+    "onCommentCreate": "/internal/on-comment-create",
+    "onCommentSubmit": "/internal/on-comment-create"
+  },
+  "scripts": {
+    "dev": "node --experimental-strip-types ./tools/build.ts --watch",
+    "build": "node --experimental-strip-types ./tools/build.ts --minify"
+  },
+  "dev": {
+    "subreddit": "scratchoddsbot_dev"
+  }
+}
