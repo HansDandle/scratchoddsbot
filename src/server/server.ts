@@ -17,8 +17,7 @@ import {
 
 // ── In-memory cache (populated from Redis on first use, refreshed by scheduler) ──
 
-// Kept for future use once gist.githubusercontent.com domain is approved
-// const GIST_BASE = "https://gist.githubusercontent.com/HansDandle/8216580aa3673f9a5fe246ffcf51f759/raw";
+const GCS_BASE = "https://storage.googleapis.com/scratchbot-data/odds";
 const TRIGGER_RE = /\$([A-Za-z]{2})(\d+)/g;
 const SUPPORTED_STATES = ["TX","FL","OR","MN","AZ","NY","CA","NJ","GA","OH","MA","CO","NE","MT"];
 
@@ -41,12 +40,33 @@ async function ensureCacheLoaded(): Promise<void> {
         gamesCache[state] = JSON.parse(raw);
         console.log(`[${state}] Loaded ${gamesCache[state]?.length ?? 0} games from Redis`);
       } else {
-        console.log(`[${state}] Redis empty, falling back to wiki`);
-        await refreshStateFromWiki(state);
+        console.log(`[${state}] Redis empty, fetching from gist`);
+        await refreshStateFromGCS(state).catch(async (err) => {
+          console.error(`[${state}] Gist fetch failed, falling back to wiki: ${err}`);
+          await refreshStateFromWiki(state);
+        });
       }
     })
   );
   cacheLoaded = true;
+}
+
+function gcsDateString(daysAgo = 0): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - daysAgo);
+  return d.toISOString().slice(0, 10);
+}
+
+async function refreshStateFromGCS(state: string): Promise<void> {
+  const s = state.toLowerCase();
+  let res = await fetch(`${GCS_BASE}/${s}/${gcsDateString(0)}.json`);
+  if (!res.ok) res = await fetch(`${GCS_BASE}/${s}/${gcsDateString(1)}.json`);
+  if (!res.ok) throw new Error(`GCS fetch failed for ${state}: ${res.status}`);
+  const games = await res.json() as any[];
+  gamesCache[state] = games;
+  await redis.set(`games:${state}`, JSON.stringify(games));
+  console.log(`[${state}] Cache refreshed from GCS: ${games.length} games`);
+
 }
 
 async function refreshStateFromWiki(state: string): Promise<void> {
@@ -73,12 +93,19 @@ function formatReply(state: string, game: any): string {
   const tiers = (game.prizeBreakdown ?? []).filter((t: any) => t.totalInGame > 0);
   const header = `**Prize tiers & odds — ${state.toUpperCase()}${game.gameNumber}: ${game.gameName}**\nTicket price: $${game.ticketPrice}\n`;
   const tableHeader = "| Prize | Remaining | Current Odds | Starting Odds |\n|:------|----------:|:-------------|:--------------|";
+  const totalInGame = tiers.reduce((s: number, t: any) => s + t.totalInGame, 0);
+  const totalRemaining = tiers.reduce((s: number, t: any) => s + t.remaining, 0);
+  const remainingTickets = game.totalTickets && totalInGame > 0
+    ? game.totalTickets * (totalRemaining / totalInGame)
+    : null;
   const rows = tiers.map((t: any) => {
-    const startingOdds =
-      game.totalTickets && t.totalInGame > 0
-        ? `1 in ${Math.round(game.totalTickets / t.totalInGame).toLocaleString()}`
-        : "N/A";
-    return `| ${t.amount} | ${t.remaining.toLocaleString()}/${t.totalInGame.toLocaleString()} | ${t.odds} | ${startingOdds} |`;
+    const currentOdds = remainingTickets && t.remaining > 0
+      ? `1 in ${Math.round(remainingTickets / t.remaining).toLocaleString()}`
+      : "N/A";
+    const startingOdds = game.totalTickets && t.totalInGame > 0
+      ? `1 in ${Math.round(game.totalTickets / t.totalInGame).toLocaleString()}`
+      : "N/A";
+    return `| ${t.amount} | ${t.remaining.toLocaleString()}/${t.totalInGame.toLocaleString()} | ${currentOdds} | ${startingOdds} |`;
   });
   const overall = game.currentOverallOdds || game.overallOdds;
   const overallLine = overall ? `\nOverall odds of winning any prize: **${overall}**` : "";
@@ -92,7 +119,7 @@ async function onCommentCreate(req: IncomingMessage): Promise<TriggerResponse> {
   await ensureCacheLoaded();
   console.log("[onCommentCreate] cache loaded, TX games:", gamesCache["TX"]?.length ?? 0);
 
-  const body = await readJSON<{ comment?: { id?: string; body?: string } }>(req).catch(() => ({}));
+  const body = await readJSON<{ comment?: { id?: string; body?: string } }>(req).catch(() => ({ comment: undefined }));
   const commentBody = body.comment?.body ?? "";
   const commentId = body.comment?.id;
   if (!commentId || !commentBody) return {};
@@ -118,8 +145,14 @@ async function onCommentCreate(req: IncomingMessage): Promise<TriggerResponse> {
 }
 
 async function onRefreshGames(): Promise<TriggerResponse> {
-  // Refresh all states from gist into Redis + in-memory cache
-  await Promise.all(SUPPORTED_STATES.map(refreshStateFromWiki));
+  await Promise.all(
+    SUPPORTED_STATES.map((state) =>
+      refreshStateFromGCS(state).catch(async (err) => {
+        console.error(`[${state}] Gist fetch failed, falling back to wiki: ${err}`);
+        await refreshStateFromWiki(state);
+      })
+    )
+  );
   return {};
 }
 
@@ -169,9 +202,13 @@ async function onRequest(
       body = await onAppInstall();
       break;
     case ApiEndpoint.OnCommentCreate:
+    case ApiEndpoint.OnCommentSubmit:
       body = await onCommentCreate(req);
       break;
     case ApiEndpoint.RefreshGames:
+      body = await onRefreshGames();
+      break;
+    case ApiEndpoint.SeedCache:
       body = await onRefreshGames();
       break;
     default:
@@ -228,8 +265,11 @@ async function onMenuNewPost(): Promise<UiResponse> {
 
 async function onAppInstall(): Promise<TriggerResponse> {
   await reddit.submitCustomPost({ title: "scratchoddsbot" });
-  // Seed Redis cache on install
-  await Promise.allSettled(SUPPORTED_STATES.map(refreshStateFromWiki));
+  await Promise.allSettled(
+    SUPPORTED_STATES.map((state) =>
+      refreshStateFromGCS(state).catch(() => refreshStateFromWiki(state))
+    )
+  );
   return {};
 }
 

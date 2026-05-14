@@ -30,7 +30,7 @@
   },
   "permissions": {
     "reddit": { "enable": true },
-    "http": { "enable": true, "domains": ["gist.githubusercontent.com"] }
+    "http": { "enable": true, "domains": ["storage.googleapis.com"] }
   },
   "scheduler": {
     "tasks": {
