@@ -18,6 +18,10 @@ Supported states: TX, FL, OR, MN, AZ, NY, CA, NJ, GA, OH, MA, CO, NE, MT
 - `npm run launch` — Publish for public review
 - `npm run login` — Log the CLI into Reddit
 
+## Fetch Domains
+
+- `storage.googleapis.com` — Used to fetch publicly available lottery scratch-off game data (odds, prize tiers, remaining tickets) hosted on Google Cloud Storage.
+
 ## Legal
 
 - [Privacy Policy](PRIVACY.md)
