@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@devvit/public-api": "^0.12.21",
-    "@devvit/web": "0.12.21",
+    "@devvit/web": "0.13.0",
     "devvit": "0.12.21"
   },
   "devDependencies": {
